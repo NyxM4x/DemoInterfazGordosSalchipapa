@@ -8,6 +8,7 @@
  * OJO: no importar este módulo desde `@/lib/menu` (ese índice es server-only).
  */
 import type { MenuCategory, MenuItem } from '@/types';
+import { RESTAURANT, demoProduct } from '@/config/restaurant';
 
 // ── Categorías ──────────────────────────────────────────────────────────────
 
@@ -22,16 +23,13 @@ export type CategoryFilter = 'all' | MenuCategory;
  */
 export const CATEGORY_TABS: ReadonlyArray<{ id: CategoryFilter; label: string }> = [
   { id: 'all', label: 'Todo' },
-  { id: 'plato', label: 'Platos' },
-  { id: 'extra', label: 'Extras' },
-  { id: 'bebida', label: 'Bebidas' },
-] as const;
+  // Solo las categorías que tienen platos en `config/restaurant`.
+  ...RESTAURANT.sectionOrder
+    .filter((id) => RESTAURANT.products.some((p) => p.category === id))
+    .map((id) => ({ id, label: RESTAURANT.categories[id] })),
+];
 
-const CATEGORY_LABELS: Record<MenuCategory, string> = {
-  plato: 'Platos',
-  bebida: 'Bebidas',
-  extra: 'Extras',
-};
+const CATEGORY_LABELS: Record<MenuCategory, string> = RESTAURANT.categories;
 
 /** Etiqueta visible de una categoría del esquema (`plato` → `Platos`). */
 export function categoryLabel(category: MenuCategory): string {
@@ -69,7 +67,7 @@ const PRODUCT_DESCRIPTIONS: Record<string, string> = {
 
 /** Descripción de vitrina de un producto, o `null` si no hay copy definido. */
 export function productDescription(code: string): string | null {
-  return PRODUCT_DESCRIPTIONS[code] ?? null;
+  return demoProduct(code)?.description ?? PRODUCT_DESCRIPTIONS[code] ?? null;
 }
 
 // ── Imágenes ────────────────────────────────────────────────────────────────
@@ -127,6 +125,8 @@ const FALLBACK_EMOJI: Record<MenuCategory, string> = {
 
 /** Imagen (o placeholder) de un producto. Nunca devuelve `undefined`. */
 export function productImage(item: Pick<MenuItem, 'code' | 'category'>): ProductImage {
+  const demo = demoProduct(item.code)?.image;
+  if (demo) return { src: demo, file: demo.split('/').pop() ?? '', emoji: FALLBACK_EMOJI[item.category] ?? '🍽️' };
   return (
     PRODUCT_IMAGES[item.code] ?? {
       src: null,
@@ -213,6 +213,9 @@ const PLATO_ORDER: readonly string[] = [
 
 /** Posición de vitrina de un `code`; los no listados van al final. */
 function ordenDeVitrina(code: string): number {
+  // Manda el orden de `config/restaurant`; `PLATO_ORDER` queda de respaldo.
+  const demo = RESTAURANT.products.findIndex((p) => p.code === code);
+  if (demo !== -1) return demo;
   const i = PLATO_ORDER.indexOf(code);
   return i === -1 ? Number.MAX_SAFE_INTEGER : i;
 }
@@ -230,7 +233,7 @@ function ordenDeVitrina(code: string): number {
  * En noche de promoción `orderSectionsForMode` sube las bebidas al principio,
  * y eso sigue mandando por encima de este orden.
  */
-const CATEGORY_SECTION_ORDER: readonly MenuCategory[] = ['plato', 'extra', 'bebida'];
+const CATEGORY_SECTION_ORDER: readonly MenuCategory[] = RESTAURANT.sectionOrder;
 
 export function groupByCategory(
   items: MenuItem[],

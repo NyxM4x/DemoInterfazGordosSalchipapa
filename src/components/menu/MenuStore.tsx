@@ -26,6 +26,18 @@ import { CheckoutPanel } from './CheckoutPanel';
 import { OrderSuccess } from './OrderSuccess';
 import { ProductCard } from './ProductCard';
 import { PromoCard } from './PromoCard';
+import { FloatingActions } from './FloatingActions';
+import { RESTAURANT, demoProduct } from '@/config/restaurant';
+import {
+  pendingChoices,
+  preparationSummary,
+  removeUnit,
+  toggleConTodoGroup,
+  toggleQuitarGroup,
+  unitsOf,
+  type Preparations,
+} from '@/lib/cart/preparation';
+import { formatMoney } from '@/lib/dashboard/format';
 
 const NO_SESSION_NOTICE = 'Abre el menú desde WhatsApp para confirmar tu pedido.';
 /** Pedidos nuevos pausados por saturación (0038, 14-09-2026). */
@@ -71,7 +83,13 @@ export function MenuStore({
   ordersPaused = false,
   whatsappChatUrl = null,
   cartSessionId = null,
+  demo = false,
 }: {
+  /**
+   * Modo DEMO (sin Supabase ni Kapso): "Continuar pedido" arma el resumen y lo
+   * abre en WhatsApp con el número de `config/restaurant`.
+   */
+  demo?: boolean;
   /**
    * La sesión del menú con que se abrió la página (19-09-2026), o `null` sin
    * enlace. El carrito guardado en el navegador solo se recupera con el mismo
@@ -117,6 +135,8 @@ export function MenuStore({
 }) {
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [cartOpen, setCartOpen] = useState(false);
+  /** "Con todo" / qué quitar, por UNIDAD de cada plato. Ver `lib/cart/preparation`. */
+  const [preparaciones, setPreparaciones] = useState<Preparations>({});
 
   /**
    * El alto REAL de la barra fija, publicado como `--menu-bar-h`
@@ -267,7 +287,7 @@ export function MenuStore({
   const hasSession = sessionToken !== null;
   // El checkout solo está disponible con un enlace que aún no se haya bloqueado,
   // y con los pedidos nuevos abiertos (0038).
-  const canCheckout = hasSession && !isSessionBlocked(checkout) && !ordersPaused;
+  const canCheckout = demo || (hasSession && !isSessionBlocked(checkout) && !ordersPaused);
   const frozen = isFrozen(checkout);
   const submitting = checkout.step === 'submitting';
 
@@ -281,7 +301,9 @@ export function MenuStore({
           ? ORDER_PAID_NOTICE
           : hasSession
             ? null
-            : NO_SESSION_NOTICE;
+            : demo
+              ? null
+              : NO_SESSION_NOTICE;
 
   /** Combos vendibles AHORA, en el formato que espera el checkout. */
   const cartPromotions = useMemo(
@@ -304,6 +326,81 @@ export function MenuStore({
         quantity: line.quantity,
       })),
     [cart.summary.lines],
+  );
+
+  /**
+   * Los platos del carrito que todavía no dicen cómo los quiere el cliente.
+   * Con alguno pendiente no se puede continuar el pedido.
+   */
+  const pendientes = useMemo(
+    () =>
+      pendingChoices(
+        cart.summary.lines.map((l) => ({ code: l.product_code, quantity: l.quantity })),
+        preparaciones,
+        (code) => demoProduct(code)?.removables,
+      ),
+    [cart.summary.lines, preparaciones],
+  );
+  const pendientesNombres = useMemo(
+    () =>
+      pendientes.map(
+        (code) => cart.summary.lines.find((l) => l.product_code === code)?.product_name_snapshot ?? code,
+      ),
+    [pendientes, cart.summary.lines],
+  );
+
+  /**
+   * El detalle de cada plato para la cocina, por código:
+   * `lomito_completo → ["1 × Con todo", "1 × Sin tomate"]`.
+   */
+  const detallePorPlato = useMemo(
+    () =>
+      new Map(
+        cart.summary.lines.map((l) => [
+          l.product_code,
+          preparationSummary(unitsOf(preparaciones, l.product_code, l.quantity)),
+        ]),
+      ),
+    [cart.summary.lines, preparaciones],
+  );
+
+  /** "Lomito Completo: 1 × Con todo, 1 × Sin tomate", para las notas del pedido. */
+  const preparacionTexto = useMemo(
+    () =>
+      cart.summary.lines
+        .map((l) => {
+          const detalle = detallePorPlato.get(l.product_code) ?? [];
+          return detalle.length > 0 ? `${l.product_name_snapshot}: ${detalle.join(', ')}` : null;
+        })
+        .filter((t): t is string => t !== null),
+    [cart.summary.lines, detallePorPlato],
+  );
+
+  // Las acciones reciben la cantidad ACTUAL del plato: la lista de unidades se
+  // ajusta a ella antes de cambiar nada (ver `unitsOf`).
+  const cantidadDe = useCallback((code: string) => cart.quantity(code), [cart]);
+
+  const handleToggleConTodo = useCallback(
+    (code: string, key: string) => {
+      setPreparaciones((p) => toggleConTodoGroup(p, code, cantidadDe(code), key));
+    },
+    [cantidadDe],
+  );
+  const handleToggleQuitar = useCallback(
+    (code: string, key: string, ingrediente: string) => {
+      setPreparaciones((p) =>
+        toggleQuitarGroup(p, code, cantidadDe(code), key, ingrediente, demoProduct(code)?.removables ?? []),
+      );
+    },
+    [cantidadDe],
+  );
+  /** "− 1" de una fila: saca ESA unidad, no la última del plato. */
+  const handleRemoveUnit = useCallback(
+    (code: string, index: number) => {
+      setPreparaciones((p) => removeUnit(p, code, cantidadDe(code), index));
+      cart.remove(code);
+    },
+    [cantidadDe, cart],
   );
 
   /** Envía el pedido y traduce el resultado a acciones del reducer. */
@@ -366,9 +463,39 @@ export function MenuStore({
   }, []);
 
   const handleOpenCheckout = useCallback(() => {
-    if (!canCheckout) return;
+    if (!canCheckout || pendientes.length > 0) return;
+    if (demo) {
+      const lineas = cart.summary.lines.map((l) => {
+        const base = `• ${l.quantity} × ${l.product_name_snapshot} — ${formatMoney(l.subtotal)}`;
+        const detalle = detallePorPlato.get(l.product_code) ?? [];
+        return [base, ...detalle.map((d) => `   ↳ ${d}`)].join('\n');
+      });
+      const texto = [
+        `¡Hola ${RESTAURANT.name}! Quiero hacer este pedido:`,
+        '',
+        ...lineas,
+        '',
+        `Total: ${formatMoney(unified.total)}`,
+      ].join('\n');
+      window.open(`https://wa.me/${RESTAURANT.whatsapp}?text=${encodeURIComponent(texto)}`, '_blank');
+      return;
+    }
     dispatch({ type: 'OPEN_FORM' });
-  }, [canCheckout]);
+    // Con pedido real, la elección viaja en las notas para la cocina. Solo si
+    // el cliente no escribió nada: no se le pisa lo que ya puso.
+    if (preparacionTexto.length > 0 && checkout.fields.notes.trim() === '') {
+      dispatch({ type: 'SET_FIELD', field: 'notes', value: preparacionTexto.join('. ') });
+    }
+  }, [
+    canCheckout,
+    pendientes.length,
+    demo,
+    cart.summary.lines,
+    unified.total,
+    detallePorPlato,
+    preparacionTexto,
+    checkout.fields.notes,
+  ]);
 
   const handleBackToCart = useCallback(() => {
     dispatch({ type: 'CLOSE' });
@@ -402,23 +529,32 @@ export function MenuStore({
   return (
     <>
       {/* Barra fija: fondo a todo el ancho, contenido centrado con el catálogo.
-          EXPERIMENTAL (rediseno-menu-fastfood): vidrio oscuro en vez del crema
-          de siempre, para no desentonar con el degradado de `page.tsx`. */}
+          Azul marino del logo, con la franja de la bandera como borde. */}
       <div
         ref={barRef}
-        className="sticky top-0 z-20 bg-donzarco-ink/85 px-4 pt-4 pb-3 shadow-lg shadow-black/20 backdrop-blur-md"
+        className="sticky top-0 z-20 bg-donzarco-ink/95 px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 shadow-lg shadow-donzarco-ink/30 backdrop-blur-md after:absolute after:inset-x-0 after:bottom-0 after:h-[3px] after:bg-[linear-gradient(90deg,var(--menu-stripe-a)_0_33%,var(--menu-stripe-b)_33%_66%,var(--menu-stripe-a)_66%)]"
       >
-        <div className="mx-auto max-w-5xl space-y-3">
-          <CategoryTabs active={category} onChange={setCategory} />
+        <div className="mx-auto flex max-w-6xl items-center gap-5">
+          <a href="#top" className="shrink-0" aria-label="Volver al inicio">
+            {RESTAURANT.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={RESTAURANT.logo} alt={RESTAURANT.name} className="h-11 w-11 rounded-full object-cover ring-2 ring-[var(--menu-orange)]/70" />
+            ) : (
+              <span className="font-display text-2xl leading-none text-white">{RESTAURANT.name}</span>
+            )}
+          </a>
+          <div className="min-w-0 flex-1">
+            <CategoryTabs active={category} onChange={setCategory} />
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-5xl space-y-6 px-4 pb-40">
+      <div id="menu" className="scroll-mt-4 pb-40">
         {/* Antes del catálogo y solo si hay algo que ofrecer. Sin promociones
             vendibles no se pinta ni el encabezado: una sección vacía titulada
             "PROMOCIONES" promete algo que no existe. */}
         {vendibles.length > 0 && (
-          <section aria-label="Promociones">
+          <section aria-label="Promociones" className="mx-auto max-w-6xl px-4">
             <SectionHeader label="Promociones" tone="promo" />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {vendibles.map(({ promotion, pricing }) => (
@@ -437,14 +573,18 @@ export function MenuStore({
         )}
 
         {hasResults ? (
-          groups.map((group) => (
-            <section key={group.category} aria-label={group.label}>
-              <SectionHeader label={group.label} />
-              {/* Móvil: 1 columna (igual que antes). Tablet: 2. Desktop amplio: 3. */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {group.items.map((item) => (
+          groups.map((group, index) => (
+            // `overflow-x-clip` recorta las fotos que se salen de la tarjeta hacia
+            // el borde de la pantalla SIN crear un contenedor de scroll: con
+            // `overflow-hidden` el encabezado `sticky` dejaría de anclarse.
+            <section key={group.category} id={`seccion-${group.category}`} aria-label={group.label} className={`relative scroll-mt-[var(--menu-bar-h)] overflow-x-clip ${index > 0 ? 'pt-4' : ''}`}>
+              <SectionHeader label={group.label} tagline={RESTAURANT.categoryTaglines[group.category]} />
+              {/* Móvil: 1 columna. Tablet: 2. Desktop amplio: 3. */}
+              <div className="mx-auto grid max-w-6xl grid-cols-1 gap-x-8 gap-y-3 px-4 pb-8 sm:grid-cols-2 sm:px-8 xl:grid-cols-3">
+                {group.items.map((item, i) => (
                   <ProductCard
                     key={item.code}
+                    flip={i % 2 === 1}
                     item={item}
                     quantity={cart.quantity(item.code)}
                     onAdd={() => cart.add(item.code)}
@@ -455,7 +595,7 @@ export function MenuStore({
             </section>
           ))
         ) : (
-          <p className="rounded-3xl bg-donzarco-ink/80 px-4 py-10 text-center text-sm text-white/80 ring-1 ring-white/15 backdrop-blur-sm">
+          <p className="mx-4 mt-6 rounded-3xl bg-donzarco-ink/80 px-4 py-10 text-center text-sm text-white/80 ring-1 ring-white/15 backdrop-blur-sm">
             {/* Sin buscador (17-09-2026) esto ya solo puede pasar si la
                 categoría elegida quedó sin nada que ofrecer. */}
             Por ahora no hay nada en esta categoría. Elige otra.
@@ -471,6 +611,8 @@ export function MenuStore({
         />
       ) : null}
 
+      <FloatingActions raised={showCartButton} />
+
       <CartPanel
         open={cartOpen && unified.units > 0 && !checkoutOpen && checkout.step !== 'success'}
         summary={cart.summary}
@@ -485,6 +627,11 @@ export function MenuStore({
         onContinue={handleOpenCheckout}
         canCheckout={canCheckout}
         checkoutNotice={cartNotice}
+        preparations={preparaciones}
+        onToggleConTodo={handleToggleConTodo}
+        onToggleQuitar={handleToggleQuitar}
+        onRemoveUnit={handleRemoveUnit}
+        pendingNames={pendientesNombres}
       />
 
       <CheckoutPanel
@@ -537,20 +684,32 @@ export function MenuStore({
  * `z-10` contra el `z-20` de la barra: al ser empujado, el encabezado pasa por
  * DEBAJO del vidrio del buscador en vez de encima.
  */
-function SectionHeader({ label, tone = 'catalogo' }: { label: string; tone?: 'catalogo' | 'promo' }) {
-  const fondo =
-    tone === 'promo'
-      ? 'from-donzarco-gold via-orange-500 to-red-600'
-      : 'from-red-700 via-red-600 to-orange-500';
-
+function SectionHeader({
+  label,
+  tagline,
+  tone = 'catalogo',
+}: {
+  label: string;
+  tagline?: string;
+  tone?: 'catalogo' | 'promo';
+}) {
+  // La banda azul nace del borde izquierdo de la pantalla y se desvanece hacia
+  // la derecha, con la franja de la bandera abajo. El degradado de papel de
+  // detrás tapa las tarjetas que pasan por debajo mientras está anclada.
   return (
     <h2
-      className={`sticky top-[var(--menu-bar-h)] z-10 -mx-4 mb-3 overflow-hidden bg-gradient-to-r px-4 py-2 shadow-lg shadow-black/30 ring-1 ring-black/20 ${fondo}`}
+      className={`sticky top-[var(--menu-bar-h)] z-10 bg-[linear-gradient(to_bottom,var(--menu-bg)_78%,transparent)] pt-3 pb-5 ${
+        tone === 'promo' ? '-mx-4' : ''
+      }`}
     >
-      {/* La trama de puntos va en su propia capa para que el texto no la herede. */}
-      <span className="menu-halftone pointer-events-none absolute inset-0 opacity-40" aria-hidden />
-      <span className="font-display relative text-2xl tracking-wider text-yellow-300 italic uppercase drop-shadow-[0_2px_0_rgba(0,0,0,0.55)]">
-        {label}
+      <span className="relative block w-[88%] max-w-xl rounded-r-2xl bg-gradient-to-r from-donzarco-ink via-donzarco-ink/95 to-donzarco-ink/0 py-2 pr-16 pl-4 shadow-lg shadow-donzarco-ink/20 sm:pl-8">
+        <span className="font-display block text-3xl leading-tight text-[var(--menu-cream)] drop-shadow-[0_2px_0_rgba(0,0,0,0.35)] sm:text-4xl">
+          {label}
+        </span>
+        {tagline ? (
+          <span className="font-body block text-xs font-medium text-[var(--menu-cream)]/75">{tagline}</span>
+        ) : null}
+        <span className="menu-stripe absolute inset-x-0 -bottom-1 h-1.5 rounded-r-full [mask-image:linear-gradient(90deg,black_60%,transparent)]" aria-hidden />
       </span>
     </h2>
   );

@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "fotos": "node scripts/preparar-fotos.mjs",
     "eval": "vitest run --config vitest.eval.config.ts",
     "eval:selection": "vitest run --config vitest.eval.config.ts evals/action-selection.eval.ts",
     "eval:grounded": "vitest run --config vitest.eval.config.ts evals/grounded-answer.eval.ts"

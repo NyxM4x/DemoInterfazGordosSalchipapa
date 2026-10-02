@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Bangers, Luckiest_Guy } from "next/font/google";
+import { Geist, Geist_Mono, Bangers, Lilita_One, Luckiest_Guy, Poppins, Shrikhand } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -43,9 +43,33 @@ const luckiestGuy = Luckiest_Guy({
   weight: "400",
 });
 
+/**
+ * Fuentes de la demo (La Milonguita): Shrikhand para títulos y nombres de
+ * plato —gruesa y con curvas, conversa con la letra cursiva del logo— y
+ * Lilita One para los precios, con dígitos que no se confunden. Poppins para
+ * el texto corrido.
+ */
+const shrikhand = Shrikhand({
+  variable: "--font-shrikhand",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const lilitaOne = Lilita_One({
+  variable: "--font-lilita",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
-  title: "Don Zarco Orders",
-  description: "Sistema de pedidos por WhatsApp para Don Zarco.",
+  title: "Menú",
+  description: "Arma tu pedido y envíalo por WhatsApp.",
 };
 
 export default function RootLayout({
@@ -56,7 +80,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} ${bangers.variable} ${luckiestGuy.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${bangers.variable} ${luckiestGuy.variable} ${shrikhand.variable} ${lilitaOne.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

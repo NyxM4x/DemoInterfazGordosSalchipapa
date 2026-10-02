@@ -12,30 +12,59 @@
   --font-mono: var(--font-geist-mono);
   /* Genera `font-display`. EXPERIMENTAL (rediseno-menu-fastfood): solo la usa
      `ProductCard` en /menu; nada más en el sitio la pide. */
-  --font-display: var(--font-bangers);
+  --font-display: var(--font-shrikhand);
   /* Genera `font-price`. Solo para cifras: en Bangers el 7 parece un 1 y los
      totales llevan 7 todo el tiempo. Ver el comentario en `layout.tsx`. */
-  --font-price: var(--font-luckiest-guy);
+  --font-price: var(--font-lilita);
+  --font-body: var(--font-poppins);
 }
 
 /*
- * Paleta de marca Don Zarco (trancapecho cochabambino). Centralizada aquí para
- * evitar rojos distintos por la interfaz. SOLO se usa en el menú del cliente
- * (`/menu`); el dashboard no la utiliza. Genera utilidades Tailwind como
- * `bg-donzarco-red-dark`, `text-donzarco-red`, `ring-donzarco-red/20`, etc.
+ * ════════════════════════════════════════════════════════════════════════
+ *  MARCA DEL RESTAURANTE — los ÚNICOS colores que hay que cambiar por cliente
+ * ════════════════════════════════════════════════════════════════════════
  *
- * Criterio: fondos y superficies en tonos pastel (crema/durazno) y acentos con
- * el rojo/naranja vivo del logo, para que botones y llamados a la acción
- * mantengan contraste suficiente sobre blanco.
+ * Dos bloques: `@theme` (genera clases Tailwind como `bg-donzarco-ink`, que
+ * usan carrito y checkout) y `:root` (variables que leen portada, tarjetas y
+ * fondo). Los nombres `donzarco-*` y `--menu-orange` son heredados de la
+ * primera demo y se conservan para no tocar componentes: lo que importa es el
+ * VALOR. Guía completa: `docs/PLANTILLA-RESTAURANTE.md`.
+ *
+ * Valores actuales: La Milonguita. Criterio "antojable": un color oscuro de
+ * FONDO (tarjetas, paneles) hace brillar por contraste el dorado de la comida;
+ * el acento claro queda para plata y acciones, y los colores de bandera o
+ * marca solo en detalles finos. Un menú con mucho color plano se lee como
+ * envase de producto, no como comida.
  */
 @theme {
-  --color-donzarco-red: #e8481f;        /* rojo del logo — acento principal */
-  --color-donzarco-red-dark: #b32d0c;   /* rojo profundo — acciones/zonas */
-  --color-donzarco-red-hover: #cc3814;  /* hover del rojo oscuro */
-  --color-donzarco-red-active: #8d2208; /* active/pressed del rojo oscuro */
-  --color-donzarco-ink: #2b1108;        /* café casi negro — texto de marca */
-  --color-donzarco-surface: #fff5ef;    /* crema durazno pastel — fondo claro */
-  --color-donzarco-gold: #f9a825;       /* naranja/amarillo del aro — acento */
+  --color-donzarco-red: #f5b82e;        /* acento principal (amarillo sol) */
+  --color-donzarco-red-dark: #c9820c;   /* acento profundo: botones con texto blanco */
+  --color-donzarco-red-hover: #d68f14;
+  --color-donzarco-red-active: #a96a06;
+  --color-donzarco-ink: #0b1630;        /* color oscuro de marca: textos, fondos, sombras */
+  --color-donzarco-surface: #16295a;    /* oscuro más claro: superficies de paneles */
+  --color-donzarco-gold: #f5b82e;       /* precios y títulos del carrito */
+}
+
+:root {
+  /* Fondo de página (papel) */
+  --menu-bg: #f4eee3;
+  --menu-bg-top: #f7f2e9;
+  --menu-bg-bottom: #efe7d9;
+  /* Portada: color de la pared de la foto de fondo, para fundirla sin bordes */
+  --menu-hero-top: #e3e4e5;
+  --menu-hero-mid: #e9e6e0;
+  /* Tarjetas de producto: degradado oscuro + resplandor detrás de la foto */
+  --menu-card-top: #1a2f63;
+  --menu-card-bottom: #0b1630;
+  --menu-glow: rgba(245, 160, 40, 0.38);
+  /* Acento principal: precios, botón +, "Ver menú" (nombre heredado) */
+  --menu-orange: #f5b82e;
+  /* Texto claro sobre las tarjetas */
+  --menu-cream: #fff4dc;
+  /* Franja decorativa bajo títulos y en la barra: A · B · A */
+  --menu-stripe-a: #74acdf;
+  --menu-stripe-b: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -80,3 +109,56 @@ body {
  * (`/menu/fondo-patron.webp`) que ya trae su propia trama, y superponer las dos
  * solo ensuciaba. Ver `app/menu/page.tsx`.
  */
+
+/* ── Piezas del menú (leen las variables de MARCA de arriba) ─────────── */
+
+/*
+ * Fondo de la página: papel con el nombre del restaurante repetido en marca
+ * de agua. La marca de agua la arma `app/menu/page.tsx` con el nombre de
+ * `config/restaurant` y la pasa en `--menu-watermark`; sin ella, papel liso.
+ */
+.menu-paper {
+  background-color: var(--menu-bg);
+  background-image:
+    var(--menu-watermark, none),
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--menu-orange) 12%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--menu-bg-top), var(--menu-bg-bottom));
+  background-size: 300px 110px, auto, auto;
+}
+
+/*
+ * Tarjeta de plato: degradado oscuro con un resplandor cálido del lado de la
+ * foto (`--glow-x`, lo pone `ProductCard`), como la luz de la vitrina.
+ */
+.menu-card {
+  background-image:
+    radial-gradient(circle at var(--glow-x, 15%) 50%, var(--menu-glow), transparent 58%),
+    linear-gradient(160deg, var(--menu-card-top), var(--menu-card-bottom) 70%);
+}
+
+/* Franja decorativa vertical (A · B · A), bajo nombres y títulos. */
+.menu-stripe {
+  background-image: linear-gradient(
+    180deg,
+    var(--menu-stripe-a) 0 33.3%,
+    var(--menu-stripe-b) 33.3% 66.6%,
+    var(--menu-stripe-a) 66.6% 100%
+  );
+}
+
+@keyframes menu-fade-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.menu-fade-up { animation: menu-fade-up 0.7s ease-out both; }
+
+/* Flotar suave de los recortes: es lo que da el efecto de "salir" del menú. */
+@keyframes menu-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -7px; }
+}
+.menu-float { animation: menu-float 4.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-fade-up, .menu-float { animation: none; }
+}

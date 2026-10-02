@@ -2,7 +2,10 @@
 
 import { CATEGORY_TABS, type CategoryFilter } from '@/lib/menu/catalog';
 
-/** Pestañas de categoría. Scroll horizontal solo dentro de la barra. */
+/**
+ * Pestañas de categoría: texto en mayúsculas, la activa en naranja con subrayado
+ * (estilo carta). Scroll horizontal solo dentro de la barra.
+ */
 export function CategoryTabs({
   active,
   onChange,
@@ -14,7 +17,7 @@ export function CategoryTabs({
     <div
       role="tablist"
       aria-label="Categorías del menú"
-      className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="flex gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {CATEGORY_TABS.map((tab) => {
         const selected = tab.id === active;
@@ -25,13 +28,17 @@ export function CategoryTabs({
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(tab.id)}
-            className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition-colors ${
-              selected
-                ? 'bg-donzarco-red-dark text-white shadow-sm shadow-donzarco-red-dark/30 ring-1 ring-donzarco-red-dark'
-                : 'bg-white text-zinc-600 ring-1 ring-zinc-200 hover:bg-zinc-50'
+            className={`font-body relative shrink-0 py-2 text-xs font-semibold tracking-wider uppercase transition-colors sm:text-sm ${
+              selected ? 'text-[var(--menu-orange)]' : 'text-white/80 hover:text-white'
             }`}
           >
             {tab.label}
+            <span
+              className={`absolute inset-x-0 -bottom-0.5 h-0.5 rounded-full bg-[var(--menu-orange)] transition-opacity ${
+                selected ? 'opacity-100' : 'opacity-0'
+              }`}
+              aria-hidden
+            />
           </button>
         );
       })}

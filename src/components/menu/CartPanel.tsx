@@ -7,6 +7,8 @@ import type { CartSummary } from '@/lib/cart/cart';
 import { formatMoney } from '@/lib/dashboard/format';
 import { unifiedTotals, type PromoCartSummary } from '@/lib/cart/promo-cart';
 import { expiryLabel, resolvePromotionImage } from '@/lib/promotions/promotion-display';
+import { demoProduct } from '@/config/restaurant';
+import { groupUnits, isChosen, unitsOf, type Preparations } from '@/lib/cart/preparation';
 import { ProductImage } from './ProductImage';
 import { QuantityControl } from './QuantityControl';
 
@@ -34,6 +36,11 @@ export function CartPanel({
   onContinue,
   canCheckout,
   checkoutNotice,
+  preparations,
+  onToggleConTodo,
+  onToggleQuitar,
+  onRemoveUnit,
+  pendingNames,
 }: {
   open: boolean;
   summary: CartSummary;
@@ -51,6 +58,18 @@ export function CartPanel({
   /** `false` sin sesión válida o con la sesión ya consumida. */
   canCheckout: boolean;
   checkoutNotice: string | null;
+  /** Cómo quiere cada UNIDAD de cada plato. Ver `lib/cart/preparation`. */
+  preparations: Preparations;
+  /** `key` identifica la fila (grupo de unidades iguales). */
+  onToggleConTodo: (code: string, key: string) => void;
+  onToggleQuitar: (code: string, key: string, ingrediente: string) => void;
+  /** Saca del carrito una unidad concreta de una fila. */
+  onRemoveUnit: (code: string, index: number) => void;
+  /**
+   * Los platos que todavía no tienen elección. Mientras haya alguno no se
+   * puede continuar: la cocina tiene que saber cómo prepararlo.
+   */
+  pendingNames: string[];
 }) {
   const itemsByCode = useMemo(
     () => new Map(items.map((item) => [item.code, item])),
@@ -128,7 +147,7 @@ export function CartPanel({
         // del menú —fondo oscuro cálido, títulos en la display, dorado para lo
         // que es plata—. La DISPOSICIÓN no cambia: hoja inferior en móvil,
         // drawer lateral desde `lg:`.
-        className="relative flex max-h-[85vh] flex-col rounded-t-3xl bg-gradient-to-b from-red-950 to-donzarco-ink shadow-xl lg:h-full lg:max-h-none lg:w-[520px] lg:max-w-[92vw] lg:rounded-none lg:rounded-l-3xl"
+        className="relative flex max-h-[85vh] flex-col rounded-t-3xl bg-gradient-to-b from-donzarco-surface to-donzarco-ink shadow-xl lg:h-full lg:max-h-none lg:w-[520px] lg:max-w-[92vw] lg:rounded-none lg:rounded-l-3xl"
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
           <h2 className="font-display text-2xl tracking-wide text-donzarco-gold uppercase">
@@ -206,8 +225,16 @@ export function CartPanel({
 
           {summary.lines.map((line) => {
             const item = itemsByCode.get(line.product_code);
+            const quitables = demoProduct(line.product_code)?.removables ?? [];
+            // Una fila por cada grupo de unidades iguales: "Con todo × 2",
+            // "Sin tomate × 1". Ver `lib/cart/preparation`.
+            const grupos =
+              quitables.length > 0
+                ? groupUnits(unitsOf(preparations, line.product_code, line.quantity))
+                : [];
             return (
-              <li key={line.product_code} className="flex items-center gap-3 py-3">
+              <li key={line.product_code} className="py-3">
+                <div className="flex items-center gap-3">
                 {item ? (
                   <ProductImage
                     item={item}
@@ -238,6 +265,68 @@ export function CartPanel({
                     tone="inverse"
                   />
                 </div>
+                </div>
+
+                {grupos.map((grupo) => {
+                  const falta = !isChosen(grupo.prep);
+                  return (
+                    <fieldset
+                      key={grupo.key}
+                      className={`mt-2 rounded-2xl px-3 pt-2 pb-3 ring-1 transition-colors ${
+                        falta ? 'bg-amber-400/10 ring-amber-300/50' : 'bg-white/5 ring-white/10'
+                      }`}
+                    >
+                      <legend className="sr-only">
+                        ¿Cómo quieres {grupo.count === 1 ? 'este' : `estos ${grupo.count}`}{' '}
+                        {line.product_name_snapshot}?
+                      </legend>
+                      <div className="flex items-center justify-between gap-2" aria-hidden>
+                        <p className={`text-xs font-semibold ${falta ? 'text-amber-200' : 'text-white/60'}`}>
+                          <span className="mr-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white/15 px-1.5 text-[11px] text-white tabular-nums">
+                            {grupo.count}
+                          </span>
+                          {falta ? 'Elige cómo lo quieres (obligatorio)' : '¿Cómo lo quieres?'}
+                        </p>
+                        {line.quantity > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onRemoveUnit(line.product_code, grupo.indices[grupo.indices.length - 1])
+                            }
+                            aria-label={`Quitar del pedido 1 ${line.product_name_snapshot} de esta fila`}
+                            className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-white/60 ring-1 ring-white/20 hover:text-white"
+                          >
+                            − 1
+                          </button>
+                        )}
+                      </div>
+                      {falta && grupo.count > 1 ? (
+                        <p className="mt-1 text-[11px] leading-snug text-white/55">
+                          Si quitas un ingrediente, separamos 1 y los demás quedan con todo.
+                        </p>
+                      ) : null}
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <Casilla
+                          label="Con todo"
+                          checked={grupo.prep.conTodo}
+                          onChange={() => onToggleConTodo(line.product_code, grupo.key)}
+                          tipo="todo"
+                        />
+                        <span className="ml-1 text-xs font-semibold text-white/50">Quitar:</span>
+                        {quitables.map((ingrediente) => (
+                          <Casilla
+                            key={ingrediente}
+                            label={ingrediente}
+                            ariaLabel={`Quitar ${ingrediente.toLowerCase()}`}
+                            checked={grupo.prep.quitar.includes(ingrediente)}
+                            onChange={() => onToggleQuitar(line.product_code, grupo.key, ingrediente)}
+                            tipo="quitar"
+                          />
+                        ))}
+                      </div>
+                    </fieldset>
+                  );
+                })}
               </li>
             );
           })}
@@ -283,11 +372,28 @@ export function CartPanel({
             El costo de envío se define al finalizar el pedido.
           </p>
 
+          {pendingNames.length > 0 ? (
+            <p
+              id="cart-pending-notice"
+              role="status"
+              className="mt-3 rounded-xl bg-amber-400/15 px-3 py-2 text-center text-sm leading-relaxed text-amber-200 ring-1 ring-amber-300/30"
+            >
+              Elige cómo quieres tu <span className="font-semibold">{listaDe(pendingNames)}</span>{' '}
+              para continuar.
+            </p>
+          ) : null}
+
           <button
             type="button"
             onClick={onContinue}
-            disabled={!canCheckout}
-            aria-describedby={checkoutNotice ? 'cart-checkout-notice' : undefined}
+            disabled={!canCheckout || pendingNames.length > 0}
+            aria-describedby={
+              pendingNames.length > 0
+                ? 'cart-pending-notice'
+                : checkoutNotice
+                  ? 'cart-checkout-notice'
+                  : undefined
+            }
             className="mt-4 w-full rounded-full bg-donzarco-gold px-5 py-4 text-base font-bold text-donzarco-ink shadow-lg shadow-black/30 transition-transform active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40"
           >
             Continuar pedido
@@ -305,6 +411,56 @@ export function CartPanel({
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * Casilla tipo píldora: un checkbox real (accesible con teclado y lector de
+ * pantalla) con aspecto de botón.
+ *
+ * Marcada habla por su color: "Con todo" en verde con ✓ (va completo), un
+ * ingrediente en rojo con ✕ (se quita). Así el cliente revisa el pedido de un
+ * vistazo sin leer cada palabra.
+ */
+function Casilla({
+  label,
+  ariaLabel,
+  checked,
+  onChange,
+  tipo,
+}: {
+  label: string;
+  ariaLabel?: string;
+  checked: boolean;
+  onChange: () => void;
+  /** `todo` = "Con todo" (verde, ✓); `quitar` = ingrediente a quitar (rojo, ✕). */
+  tipo: 'todo' | 'quitar';
+}) {
+  const todo = tipo === 'todo';
+  return (
+    <label className="cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        aria-label={ariaLabel}
+        className="peer sr-only"
+      />
+      <span
+        className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-white ${
+          checked
+            ? todo
+              ? 'bg-emerald-500 text-white ring-emerald-400'
+              : 'bg-red-600 text-white ring-red-500'
+            : todo
+              ? 'bg-white/10 text-white ring-white/30'
+              : 'bg-transparent text-white/80 ring-white/20'
+        }`}
+      >
+        <span aria-hidden>{checked ? (todo ? '✓' : '✕') : todo ? '○' : '−'}</span>
+        {label}
+      </span>
+    </label>
   );
 }
 

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import type { CSSProperties } from 'react';
 import { connection } from 'next/server';
 import type { MenuItem } from '@/types';
 import { createMenuRepository } from '@/lib/menu';
@@ -12,18 +13,34 @@ import { businessChatUrl } from '@/lib/menu/whatsapp-chat';
 import { createMenuSessionRepository } from '@/lib/menu/session-repository';
 import { hashMenuSessionToken } from '@/lib/menu/session-token';
 import { loadOrderCart, type OrderCart } from '@/lib/orders/order-cart';
-import { MenuHeader } from '@/components/menu/MenuHeader';
 import { ReplacingOrderBanner } from '@/components/menu/ReplacingOrderBanner';
 import { MenuStore } from '@/components/menu/MenuStore';
 import { ServiceNoticeBanner } from '@/components/menu/ServiceNoticeBanner';
+import { MenuHero } from '@/components/menu/MenuHero';
+import { RESTAURANT, demoMenuItems } from '@/config/restaurant';
+import { watermarkBackground } from '@/lib/menu/watermark';
+
+/** Marca de agua del fondo, con el nombre de `config/restaurant`. */
+const fondoMarca = (
+  RESTAURANT.watermark
+    ? { '--menu-watermark': watermarkBackground(RESTAURANT.watermark, RESTAURANT.themeColor) }
+    : {}
+) as CSSProperties;
+
+/**
+ * Modo DEMO: el menú sale de `config/restaurant` y no toca Supabase ni Kapso.
+ * Se enciende con `MENU_DEMO=true` en `.env.local`, o solo cuando falta
+ * `SUPABASE_URL` (así corre en localhost sin configurar nada).
+ */
+const isDemo = () => process.env.MENU_DEMO === 'true' || !process.env.SUPABASE_URL;
 
 export const metadata: Metadata = {
-  title: 'Don Zarco — Menú',
-  description: 'Menú de Don Zarco: platos, bebidas y extras. Pide por WhatsApp.',
+  title: `${RESTAURANT.name} — Menú`,
+  description: `Menú de ${RESTAURANT.name}. Arma tu pedido y envíalo por WhatsApp.`,
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0b3d2e',
+  themeColor: RESTAURANT.themeColor,
 };
 
 /**
@@ -50,6 +67,15 @@ export default async function MenuPage(props: {
   // durante horas no se queda mostrando el pasado.
   // eslint-disable-next-line react-hooks/purity
   const serverNow = Date.now();
+
+  if (isDemo()) {
+    return (
+      <main id="top" className="menu-paper relative isolate flex-1 text-donzarco-ink" style={fondoMarca}>
+        <MenuHero serverNow={serverNow} />
+        <MenuStore demo items={demoMenuItems()} promotions={[]} serverNow={serverNow} sessionToken={null} />
+      </main>
+    );
+  }
 
   // Validación de sesión (opcional: sin ?session el menú sigue abierto).
   const searchParams = await props.searchParams;
@@ -159,13 +185,9 @@ export default async function MenuPage(props: {
     //
     // `isolate` mantiene el apilado dentro de este `<main>`: sin él, la capa de
     // z-0 podría irse detrás del fondo del `<body>` y no verse nunca.
-    <main className="relative isolate flex-1 bg-gradient-to-br from-orange-400 via-orange-500 to-yellow-500 text-white">
-      <div
-        className="pointer-events-none fixed inset-0 z-0 bg-[url('/menu/fondo-patron.webp')] bg-cover bg-center"
-        aria-hidden
-      />
+    <main id="top" className="menu-paper relative isolate flex-1 text-donzarco-ink" style={fondoMarca}>
       <div className="relative z-10">
-        <MenuHeader />
+        <MenuHero serverNow={serverNow} />
         {ordersPaused && (
           <div role="status" className="bg-red-600 px-4 py-3 text-center text-sm font-semibold text-white">
             Estamos con demasiados pedidos y pausamos los nuevos por un rato. Vuelve a intentarlo en
@@ -218,7 +240,7 @@ function MenuSessionExpired() {
   return (
     // Trae su propio degradado: esta rama devuelve ANTES del `<main>` de arriba,
     // así que sin esto sería la única pantalla de /menu con el fondo viejo.
-    <div className="flex-1 bg-gradient-to-br from-orange-400 via-orange-500 to-yellow-500 px-4 py-16">
+    <div className="flex-1 menu-paper px-4 py-16" style={fondoMarca}>
       <div className="mx-auto max-w-sm rounded-3xl bg-donzarco-ink/85 px-6 py-10 text-center ring-1 ring-white/15 backdrop-blur-sm">
         <span className="text-4xl" aria-hidden>
           ⏱️

@@ -72,7 +72,7 @@ export function PromoCard({
      * blanco, que es lo único que contrasta contra ambos.
      */
     <article
-      className={`flex gap-3 rounded-3xl bg-gradient-to-br from-donzarco-ink to-red-950 p-3 shadow-lg shadow-black/40 ring-2 transition-shadow hover:shadow-xl ${
+      className={`flex gap-3 rounded-3xl bg-gradient-to-br from-donzarco-ink to-donzarco-surface p-3 shadow-lg shadow-black/40 ring-2 transition-shadow hover:shadow-xl ${
         enCarrito ? 'ring-white' : 'ring-donzarco-gold/80'
       }`}
     >
