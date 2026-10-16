@@ -21,7 +21,8 @@ function aMinutos(hhmm: string): number {
  * Todo sale de `config/restaurant`.
  *
  * Pensada para un fondo CLARO (una pared con el letrero): sin velo negro, que
- * dejaría la pared gris, y con los textos en el color oscuro de marca. El
+ * dejaría la pared gris, y con los textos en el color oscuro de marca. Con una
+ * pared oscura, `heroDark` pasa el eslogan al color claro de marca. El
  * degradado de la portada usa `--menu-hero-top/mid` (el color de la pared de
  * la foto) para que la foto se funda sin que se note su borde.
  */
@@ -74,7 +75,13 @@ export function MenuHero({ serverNow }: { serverNow: number }) {
               {RESTAURANT.name}
             </p>
           )}
-          <p className="font-display text-3xl leading-tight text-donzarco-ink sm:text-4xl">
+          <p
+            className={`font-display text-3xl leading-tight sm:text-4xl ${
+              RESTAURANT.heroDark
+                ? 'text-[var(--menu-cream)] drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]'
+                : 'text-donzarco-ink'
+            }`}
+          >
             {RESTAURANT.tagline}
           </p>
           <div className="menu-stripe mx-auto mt-3 h-1.5 w-24 rounded-full shadow-sm" aria-hidden />
@@ -103,6 +110,7 @@ export function MenuHero({ serverNow }: { serverNow: number }) {
 function PortadaConPlatos() {
   const platos = RESTAURANT.heroDishes
     .map((code) => demoProduct(code))
+    .map((p) => p && { ...p, image: p.heroImage ?? p.image })
     .filter((p): p is NonNullable<typeof p> => Boolean(p?.image))
     .slice(0, 3);
   const [centro, izq, der] = platos;

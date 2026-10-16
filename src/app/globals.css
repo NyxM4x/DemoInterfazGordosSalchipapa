@@ -30,41 +30,41 @@
  * primera demo y se conservan para no tocar componentes: lo que importa es el
  * VALOR. Guía completa: `docs/PLANTILLA-RESTAURANTE.md`.
  *
- * Valores actuales: La Milonguita. Criterio "antojable": un color oscuro de
+ * Valores actuales: Gordos. Criterio "antojable": un color oscuro de
  * FONDO (tarjetas, paneles) hace brillar por contraste el dorado de la comida;
  * el acento claro queda para plata y acciones, y los colores de bandera o
  * marca solo en detalles finos. Un menú con mucho color plano se lee como
  * envase de producto, no como comida.
  */
 @theme {
-  --color-donzarco-red: #f5b82e;        /* acento principal (amarillo sol) */
-  --color-donzarco-red-dark: #c9820c;   /* acento profundo: botones con texto blanco */
-  --color-donzarco-red-hover: #d68f14;
-  --color-donzarco-red-active: #a96a06;
-  --color-donzarco-ink: #0b1630;        /* color oscuro de marca: textos, fondos, sombras */
-  --color-donzarco-surface: #16295a;    /* oscuro más claro: superficies de paneles */
-  --color-donzarco-gold: #f5b82e;       /* precios y títulos del carrito */
+  --color-donzarco-red: #ffad1f;        /* acento principal (ámbar del neón) */
+  --color-donzarco-red-dark: #d9480f;   /* acento profundo: botones con texto blanco */
+  --color-donzarco-red-hover: #e8590c;
+  --color-donzarco-red-active: #b83b0b;
+  --color-donzarco-ink: #2a1008;        /* color oscuro de marca: textos, fondos, sombras */
+  --color-donzarco-surface: #4a1d0c;    /* oscuro más claro: superficies de paneles */
+  --color-donzarco-gold: #ffad1f;       /* precios y títulos del carrito */
 }
 
 :root {
-  /* Fondo de página (papel) */
-  --menu-bg: #f4eee3;
-  --menu-bg-top: #f7f2e9;
-  --menu-bg-bottom: #efe7d9;
+  /* Fondo de página (papel kraft claro, como las cajas) */
+  --menu-bg: #f3e6d3;
+  --menu-bg-top: #f7ecdc;
+  --menu-bg-bottom: #ecdcc4;
   /* Portada: color de la pared de la foto de fondo, para fundirla sin bordes */
-  --menu-hero-top: #e3e4e5;
-  --menu-hero-mid: #e9e6e0;
+  --menu-hero-top: #6e2a09;
+  --menu-hero-mid: #4a1806;
   /* Tarjetas de producto: degradado oscuro + resplandor detrás de la foto */
-  --menu-card-top: #1a2f63;
-  --menu-card-bottom: #0b1630;
-  --menu-glow: rgba(245, 160, 40, 0.38);
+  --menu-card-top: #5a230d;
+  --menu-card-bottom: #2a1008;
+  --menu-glow: rgba(255, 150, 40, 0.42);
   /* Acento principal: precios, botón +, "Ver menú" (nombre heredado) */
-  --menu-orange: #f5b82e;
+  --menu-orange: #ffad1f;
   /* Texto claro sobre las tarjetas */
-  --menu-cream: #fff4dc;
+  --menu-cream: #fff3df;
   /* Franja decorativa bajo títulos y en la barra: A · B · A */
-  --menu-stripe-a: #74acdf;
-  --menu-stripe-b: #ffffff;
+  --menu-stripe-a: #ff7a1a;
+  --menu-stripe-b: #fff3df;
 }
 
 @media (prefers-color-scheme: dark) {

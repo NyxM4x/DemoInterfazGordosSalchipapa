@@ -12,6 +12,10 @@ si hace falta, fuentes.
 | 3. Fotos y logo | `public/menu/<local>/` + `npm run fotos` |
 | 4. Fuentes (opcional) | `src/app/layout.tsx` |
 
+**Restaurante activo: Gordos** (salchipapas, fotos en `public/menu/gordos/`).
+Detalle de dónde está cada cosa en `AGENTS.md`. La Milonguita, la anterior,
+quedó en el commit `fcf550f`.
+
 La demo corre sin Supabase ni Kapso: con `SUPABASE_URL` vacío (o
 `MENU_DEMO=true`) los platos salen de `config/restaurant` y "Continuar pedido"
 abre WhatsApp con el resumen.
@@ -28,6 +32,8 @@ Todo en el objeto `RESTAURANT`:
   mismo que `--color-donzarco-ink` (paso 2).
 - `logo`, `heroBackground` (foto de la portada), `heroDishes` (los 3 `code`
   que flotan en la portada: centro, izquierda, derecha).
+- `heroDark`: `true` si la pared de la portada es oscura; el eslogan pasa al
+  color claro de marca.
 - `hours`, `whatsapp` (con código de país, sin `+`), `mapsUrl`, `currency`.
 - `categories` (nombre de cada sección), `categoryTaglines` (bajada bajo el
   título), `sectionOrder`.
@@ -42,6 +48,7 @@ Todo en el objeto `RESTAURANT`:
   priceFrom: false,             // true = "Precios desde"
   description: 'Lomo a la plancha, queso, tomate…',
   image: '/menu/milonguita/lomito.webp',   // null = tarjeta con "Foto pronto"
+  heroImage: null,              // opcional: otra foto para la portada
   removables: ['Tomate', 'Lechuga', 'Queso'], // opcional, ver abajo
 }
 ```
@@ -103,6 +110,11 @@ Qué pedir (o generar):
   libre abajo (ahí flotan los 3 platos). Mejor pared clara y lisa.
 - **Logo**: cuadrado o redondo; si es redondo con esquinas de color, el
   script lo recorta en círculo.
+
+**Fotos apaisadas** (más anchas que altas, como las salchipapas de Gordos):
+en la tarjeta tapan el texto, porque la foto ocupa un cuadro un 12 % más ancho
+que su columna. Para la tarjeta se usa un 800×800 con más margen
+(`*-tarjeta.webp`) y para la portada el original en `heroImage`.
 
 Procesarlas, todas con el mismo formato (recorte, margen, 800×800 WebP):
 
